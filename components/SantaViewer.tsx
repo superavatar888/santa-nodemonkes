@@ -5,6 +5,8 @@ import { useState, useEffect } from "react"
 const isMobile = typeof window !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 const defaultResolution = isMobile ? 280 : 560
 
+const BASE_PATH = "/santa-nodemonkes"; // Manually define the base path for static assets
+
 interface Metadata {
   id: number
   inscription: number
