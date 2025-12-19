@@ -214,9 +214,18 @@ export default function SantaViewer() {
       showStatus("无法创建图片，浏览器支持不足。", true);
       return;
     }
+    
+    // Disable image smoothing to preserve pixel art style
+    ctx.imageSmoothingEnabled = false;
+    // @ts-ignore: vendor-specific property
+    ctx.mozImageSmoothingEnabled = false;
+    // @ts-ignore: vendor-specific property
+    ctx.webkitImageSmoothingEnabled = false;
+    // @ts-ignore: vendor-specific property
+    ctx.msImageSmoothingEnabled = false;
 
     const img = new Image();
-    img.crossOrigin = 'anonymous'; // Important for fetching images from a different origin if needed
+    img.crossOrigin = 'anonymous';
     img.src = imageUrl;
 
     img.onload = () => {
