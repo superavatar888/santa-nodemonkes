@@ -201,15 +201,45 @@ export default function SantaViewer() {
 
   const downloadImage = () => {
     if (!imageUrl) {
-        showStatus("没有可供下载的图片", true);
-        return;
+      showStatus("没有可供下载的图片", true);
+      return;
     }
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = `santa-nodemonke-${id}.png`; 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = resolution;
+    canvas.height = resolution;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      showStatus("无法创建图片，浏览器支持不足。", true);
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous'; // Important for fetching images from a different origin if needed
+    img.src = imageUrl;
+
+    img.onload = () => {
+      // Fill background
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, resolution, resolution);
+
+      // Draw image
+      ctx.drawImage(img, 0, 0, resolution, resolution);
+
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `santa-nodemonke-${id}-${resolution}px.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showStatus("图片已开始下载！");
+    };
+
+    img.onerror = () => {
+      showStatus("加载图片失败，无法完成下载。", true);
+    };
   };
 
   return (
