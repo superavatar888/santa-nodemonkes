@@ -205,45 +205,60 @@ export default function SantaViewer() {
       return;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = resolution;
-    canvas.height = resolution;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-      showStatus("无法创建图片，浏览器支持不足。", true);
-      return;
-    }
-    
-    // Disable image smoothing to preserve pixel art style
-    ctx.imageSmoothingEnabled = false;
-    // @ts-ignore: vendor-specific property
-    ctx.mozImageSmoothingEnabled = false;
-    // @ts-ignore: vendor-specific property
-    ctx.webkitImageSmoothingEnabled = false;
-    // @ts-ignore: vendor-specific property
-    ctx.msImageSmoothingEnabled = false;
-
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = imageUrl;
 
     img.onload = () => {
-      // Fill background
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, resolution, resolution);
+      // Create a source canvas to get original pixel data
+      const srcCanvas = document.createElement('canvas');
+      const srcCtx = srcCanvas.getContext('2d');
+      if (!srcCtx) return;
+      
+      const originalWidth = img.naturalWidth;
+      const originalHeight = img.naturalHeight;
+      srcCanvas.width = originalWidth;
+      srcCanvas.height = originalHeight;
+      srcCtx.drawImage(img, 0, 0);
+      const srcData = srcCtx.getImageData(0, 0, originalWidth, originalHeight).data;
 
-      // Draw image
-      ctx.drawImage(img, 0, 0, resolution, resolution);
+      // Create a destination canvas
+      const destCanvas = document.createElement('canvas');
+      destCanvas.width = resolution;
+      destCanvas.height = resolution;
+      const destCtx = destCanvas.getContext('2d');
+      if (!destCtx) return;
+
+      // Fill background
+      destCtx.fillStyle = bgColor;
+      destCtx.fillRect(0, 0, resolution, resolution);
+
+      const pixelSize = resolution / originalWidth;
+
+      // Manual nearest-neighbor scaling
+      for (let y = 0; y < originalHeight; y++) {
+        for (let x = 0; x < originalWidth; x++) {
+          const i = (y * originalWidth + x) * 4;
+          const r = srcData[i];
+          const g = srcData[i + 1];
+          const b = srcData[i + 2];
+          const a = srcData[i + 3];
+
+          if (a > 0) { // Only draw non-transparent pixels
+            destCtx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
+            destCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+          }
+        }
+      }
 
       // Trigger download
       const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = `santa-nodemonke-${id}-${resolution}px.png`;
+      link.href = destCanvas.toDataURL('image/png');
+      link.download = `santa-nodemonke-${id}-${resolution}px-HD.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showStatus("图片已开始下载！");
+      showStatus("高清图片已开始下载！");
     };
 
     img.onerror = () => {
