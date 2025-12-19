@@ -5,8 +5,6 @@ import { useState, useEffect } from "react"
 const isMobile = typeof window !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 const defaultResolution = isMobile ? 280 : 560
 
-const BASE_PATH = "/santa-nodemonkes"; // Manually define the base path for static assets
-
 type ColorMap = {
   [key: string]: string;
 };
@@ -33,7 +31,7 @@ export default function SantaViewer() {
   const loadColorMap = async () => {
     try {
       showStatus("正在加载背景颜色数据...")
-      const response = await fetch(`${BASE_PATH}/body-colors.json`);
+      const response = await fetch(`/body-colors.json`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -66,7 +64,7 @@ export default function SantaViewer() {
   const updateImage = (imageId: string) => {
     const parsedId = parseInt(imageId, 10)
     if (!isNaN(parsedId) && parsedId >= 1 && parsedId <= 10000) {
-      setImageUrl(`${BASE_PATH}/assets/merged/${imageId}.png`)
+      setImageUrl(`/assets/merged/${imageId}.png`)
     } else {
       setImageUrl("")
     }
