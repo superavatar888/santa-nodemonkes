@@ -7,86 +7,9 @@ const defaultResolution = isMobile ? 280 : 560
 
 const BASE_PATH = "/santa-nodemonkes"; // Manually define the base path for static assets
 
-interface Metadata {
-  id: number
-  inscription: number
-  attributes: {
-    Body: string
-    [key: string]: string
-  }
-}
-
-type BodyColorType = {
-  [key: string]: string
-} & {
-  albino: string
-  alien: string
-  beak: string
-  binary: string
-  boned: string
-  bot: string
-  brown: string
-  dark: string
-  deathbot: string
-  dos: string
-  gold: string
-  green: string
-  grey: string
-  hyena: string
-  ion: string
-  light: string
-  medium: string
-  mempool: string
-  moon: string
-  patriot: string
-  pepe: string
-  pink: string
-  purple: string
-  rainbow: string
-  red: string
-  safemode: string
-  striped: string
-  underlord: string
-  vhs: string
-  white: string
-  wrapped: string
-  zombie: string
-}
-
-const BODY_COLORS: BodyColorType = {
-  albino: "#BDADAD",
-  alien: "#04CFE7",
-  beak: "#F8AC00",
-  binary: "#010101",
-  boned: "#000000",
-  bot: "#484848",
-  brown: "#310000",
-  dark: "#482510",
-  deathbot: "#282831",
-  dos: "#0002A5",
-  gold: "#FFAA01",
-  green: "#002205",
-  grey: "#232A30",
-  hyena: "#BA8837",
-  ion: "#060F26",
-  light: "#B7844F",
-  medium: "#945321",
-  mempool: "#BE0B3A",
-  moon: "#3501BB",
-  patriot: "#0D0060",
-  pepe: "#127602",
-  pink: "#E944CE",
-  purple: "#38034A",
-  rainbow: "#009DFF",
-  red: "#630001",
-  safemode: "#000DFF",
-  striped: "#110654",
-  underlord: "#9C0901",
-  vhs: "#0600FF",
-  white: "#c7bcb6",
-  wrapped: "#FFFFFF",
-  zombie: "#104119",
-}
+type ColorMap = {
+  [key: string]: string;
+};
 
 export default function SantaViewer() {
   const [id, setId] = useState("1")
@@ -96,52 +19,32 @@ export default function SantaViewer() {
   const [status, setStatus] = useState("")
   const [isError, setIsError] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
-  const [metadata, setMetadata] = useState<Metadata[]>([])
-  const [metadataLoaded, setMetadataLoaded] = useState(false)
+  const [colorMap, setColorMap] = useState<ColorMap>({});
+  const [colorMapLoaded, setColorMapLoaded] = useState(false);
 
   useEffect(() => {
-    loadMetadata()
+    loadColorMap()
   }, [])
 
   useEffect(() => {
     updateImage(id)
   }, [id])
 
-  const loadMetadata = async () => {
-    const metadataUrls = [
-      "https://pub-ce8a03b190984a3d99332e13b7d5e3cb.r2.dev/metadata.json",
-      "https://metadata.138148178.xyz/metadata.json",
-      "https://nodemonkes.4everland.store/metadata.json",
-    ]
-
-    for (const url of metadataUrls) {
-      try {
-        showStatus("正在加载元数据...")
-        const response = await fetch(url, {
-          mode: "cors",
-          headers: {
-            Accept: "application/json",
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-
-        const data = await response.json()
-        setMetadata(data)
-        setMetadataLoaded(true)
-        showStatus(
-          `元数据加载完成 (${data.length} 个NFT) - 数据源: ${url.includes("pub-ce8a03b") ? "R2主源" : "备用源"}`,
-        )
-        return
-      } catch (error) {
-        console.error(`Failed to load metadata from ${url}:`, error)
-        if (url === metadataUrls[metadataUrls.length - 1]) {
-          showStatus("无法加载元数据，自动背景功能将不可用。", true)
-          setMetadataLoaded(false)
-        }
+  const loadColorMap = async () => {
+    try {
+      showStatus("正在加载背景颜色数据...")
+      const response = await fetch(`${BASE_PATH}/body-colors.json`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
+      const data = await response.json();
+      setColorMap(data);
+      setColorMapLoaded(true);
+      showStatus("背景颜色数据加载完成！");
+    } catch (error) {
+      console.error('Failed to load color map:', error);
+      showStatus("无法加载背景颜色数据，自动背景功能将不可用。", true);
+      setColorMapLoaded(false);
     }
   }
 
@@ -170,18 +73,13 @@ export default function SantaViewer() {
   }
 
   const getAutoBackground = (imageId: number) => {
-    const item = metadata.find((item) => item.id === imageId)
-    if (item?.attributes?.Body) {
-      const bodyType = item.attributes.Body.toLowerCase()
-      return (BODY_COLORS as BodyColorType)[bodyType] || null
-    }
-    return null
+    return colorMap[imageId] || null;
   }
 
   const updateBackground = (type: "auto" | "custom") => {
     if (type === "auto") {
-      if (!metadataLoaded) {
-        showStatus("元数据未加载，无法使用自动背景功能。", true)
+      if (!colorMapLoaded) {
+        showStatus("颜色数据未加载，无法使用自动背景功能。", true)
         return
       }
       const imageId = parseInt(id, 10)
@@ -304,14 +202,14 @@ export default function SantaViewer() {
         style={{
           marginBottom: '20px',
           padding: '10px',
-          background: metadataLoaded ? 'rgba(22, 163, 74, 0.5)' : 'rgba(251, 191, 36, 0.5)',
+          background: colorMapLoaded ? 'rgba(22, 163, 74, 0.5)' : 'rgba(251, 191, 36, 0.5)',
           borderRadius: '8px',
           fontSize: '14px',
           color: '#F1FAEE',
-          border: metadataLoaded ? '1px solid #16A34A' : '1px solid #FBBF24',
+          border: colorMapLoaded ? '1px solid #16A34A' : '1px solid #FBBF24',
         }}
       >
-        Status: {metadataLoaded ? "✅ Metadata Loaded" : "⚠️ Metadata Loading Failed"}
+        Status: {colorMapLoaded ? "✅ Color Data Loaded" : "⚠️ Loading Color Data..."}
       </div>
 
       {/* ID 输入 */}
