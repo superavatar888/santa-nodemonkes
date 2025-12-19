@@ -109,7 +109,6 @@ export default function SantaViewer() {
     const metadataUrls = [
       "https://pub-ce8a03b190984a3d99332e13b7d5e3cb.r2.dev/metadata.json",
       "https://metadata.138148178.xyz/metadata.json",
-      "https://nodemonkes.4everland.store/metadata.json",
     ]
 
     for (const url of metadataUrls) {
