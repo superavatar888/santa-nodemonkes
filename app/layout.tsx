@@ -1,14 +1,17 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Mountains_of_Christmas } from "next/font/google"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const mountainsOfChristmas = Mountains_of_Christmas({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+})
 
 export const metadata: Metadata = {
-  title: "Nodemonkes GIF Generator",
-  description: "Generate animated GIFs from Nodemonkes NFT collection",
-  keywords: ["Nodemonkes", "NFT", "GIF", "Animation", "Bitcoin"],
+  title: "Santa Nodemonkes Viewer",
+  description: "Check out the Santa Nodemonkes collection with custom backgrounds!",
+  keywords: ["Nodemonkes", "NFT", "Christmas", "Santa"],
   authors: [{ name: "Nodemonkes Community" }],
   viewport: "width=device-width, initial-scale=1",
 }
@@ -20,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={mountainsOfChristmas.className}>{children}</body>
     </html>
   )
 }

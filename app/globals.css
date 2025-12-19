@@ -57,3 +57,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+body {
+  background-color: #1A3A1A;
+  color: white;
+}
