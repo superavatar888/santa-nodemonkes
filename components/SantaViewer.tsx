@@ -90,7 +90,7 @@ const BODY_COLORS: BodyColorType = {
 
 export default function SantaViewer() {
   const [id, setId] = useState("1")
-  const [resolution, setResolution] = useState(defaultResolution)
+  const [scaleFactor, setScaleFactor] = useState(20); // Default scale 20x (560px)
   const [bgColor, setBgColor] = useState("#ffffff")
   const [imageUrl, setImageUrl] = useState("")
   const [status, setStatus] = useState("")
@@ -98,6 +98,8 @@ export default function SantaViewer() {
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [metadata, setMetadata] = useState<Metadata[]>([])
   const [metadataLoaded, setMetadataLoaded] = useState(false)
+
+  const resolution = scaleFactor * 28;
 
   useEffect(() => {
     loadMetadata()
@@ -210,48 +212,60 @@ export default function SantaViewer() {
     img.src = imageUrl;
 
     img.onload = () => {
-      // Create a temporary source canvas to draw the original image
+      const originalWidth = img.naturalWidth;
+      const originalHeight = img.naturalHeight;
+
+      // Create a source canvas to get original pixel data
       const srcCanvas = document.createElement('canvas');
       const srcCtx = srcCanvas.getContext('2d');
       if (!srcCtx) {
         showStatus("无法创建图片，浏览器支持不足。", true);
         return;
-      }
-      
-      const originalWidth = img.naturalWidth;
-      const originalHeight = img.naturalHeight;
+      };
       srcCanvas.width = originalWidth;
       srcCanvas.height = originalHeight;
       srcCtx.drawImage(img, 0, 0);
+      const srcData = srcCtx.getImageData(0, 0, originalWidth, originalHeight).data;
 
-      // Create the destination canvas
+      // Create a destination canvas
       const destCanvas = document.createElement('canvas');
-      destCanvas.width = resolution;
-      destCanvas.height = resolution;
+      const finalResolution = scaleFactor * originalWidth;
+      destCanvas.width = finalResolution;
+      destCanvas.height = finalResolution;
       const destCtx = destCanvas.getContext('2d');
       if (!destCtx) {
         showStatus("无法创建图片，浏览器支持不足。", true);
         return;
-      }
+      };
 
       // Fill background
       destCtx.fillStyle = bgColor;
-      destCtx.fillRect(0, 0, resolution, resolution);
-      
-      // Disable image smoothing on the destination canvas
-      destCtx.imageSmoothingEnabled = false;
+      destCtx.fillRect(0, 0, finalResolution, finalResolution);
 
-      // Draw the source canvas onto the destination canvas, scaling it up
-      destCtx.drawImage(srcCanvas, 0, 0, originalWidth, originalHeight, 0, 0, resolution, resolution);
+      // Manual nearest-neighbor scaling
+      for (let y = 0; y < originalHeight; y++) {
+        for (let x = 0; x < originalWidth; x++) {
+          const i = (y * originalWidth + x) * 4;
+          const r = srcData[i];
+          const g = srcData[i + 1];
+          const b = srcData[i + 2];
+          const a = srcData[i + 3];
+
+          if (a > 0) { // Only draw non-transparent pixels
+            destCtx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
+            destCtx.fillRect(x * scaleFactor, y * scaleFactor, scaleFactor, scaleFactor);
+          }
+        }
+      }
 
       // Trigger download
       const link = document.createElement('a');
       link.href = destCanvas.toDataURL('image/png');
-      link.download = `santa-nodemonke-${id}-${resolution}px-HD.png`;
+      link.download = `santa-nodemonke-${id}-${finalResolution}px-HD.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showStatus("高清图片已开始下载！");
+      showStatus("超高清图片已开始下载！");
     };
 
     img.onerror = () => {
@@ -338,31 +352,26 @@ export default function SantaViewer() {
         </div>
       </div>
 
-      {/* 分辨率设置 */}
+      {/* 缩放倍数设置 */}
       <div style={{ margin: '30px 0' }}>
-        <label htmlFor="resolutionInput" style={{ marginRight: '10px', fontSize: '16px', color: '#F1FAEE' }}>
-          Resolution (px):
+        <label htmlFor="scaleInput" style={{ marginRight: '10px', fontSize: '16px', color: '#F1FAEE' }}>
+          Scale Factor (1x-50x): {scaleFactor}x
         </label>
         <input
-          id="resolutionInput"
-          type="number"
-          value={resolution}
-          onChange={(e) => setResolution(Number(e.target.value))}
-          min={28}
-          max={1200}
-          step={28}
+          id="scaleInput"
+          type="range"
+          value={scaleFactor}
+          onChange={(e) => setScaleFactor(Number(e.target.value))}
+          min={1}
+          max={50}
+          step={1}
           style={{
-            padding: '10px',
-            fontSize: '16px',
-            width: '120px',
-            border: '2px solid #A8DADC',
-            borderRadius: '8px',
-            background: 'rgba(29, 53, 87, 0.7)',
-            color: 'white',
+            width: '240px',
+            cursor: 'pointer',
           }}
         />
         <div style={{ fontSize: '12px', color: '#F1FAEE', marginTop: '8px' }}>
-          Adjust the size of the image (Original: 28x28)
+          Current Resolution: {resolution}x{resolution}px
         </div>
       </div>
 
