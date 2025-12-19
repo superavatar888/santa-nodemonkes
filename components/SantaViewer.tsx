@@ -210,46 +210,39 @@ export default function SantaViewer() {
     img.src = imageUrl;
 
     img.onload = () => {
-      // Create a source canvas to get original pixel data
+      // Create a temporary source canvas to draw the original image
       const srcCanvas = document.createElement('canvas');
       const srcCtx = srcCanvas.getContext('2d');
-      if (!srcCtx) return;
+      if (!srcCtx) {
+        showStatus("无法创建图片，浏览器支持不足。", true);
+        return;
+      }
       
       const originalWidth = img.naturalWidth;
       const originalHeight = img.naturalHeight;
       srcCanvas.width = originalWidth;
       srcCanvas.height = originalHeight;
       srcCtx.drawImage(img, 0, 0);
-      const srcData = srcCtx.getImageData(0, 0, originalWidth, originalHeight).data;
 
-      // Create a destination canvas
+      // Create the destination canvas
       const destCanvas = document.createElement('canvas');
       destCanvas.width = resolution;
       destCanvas.height = resolution;
       const destCtx = destCanvas.getContext('2d');
-      if (!destCtx) return;
+      if (!destCtx) {
+        showStatus("无法创建图片，浏览器支持不足。", true);
+        return;
+      }
 
       // Fill background
       destCtx.fillStyle = bgColor;
       destCtx.fillRect(0, 0, resolution, resolution);
+      
+      // Disable image smoothing on the destination canvas
+      destCtx.imageSmoothingEnabled = false;
 
-      const pixelSize = resolution / originalWidth;
-
-      // Manual nearest-neighbor scaling
-      for (let y = 0; y < originalHeight; y++) {
-        for (let x = 0; x < originalWidth; x++) {
-          const i = (y * originalWidth + x) * 4;
-          const r = srcData[i];
-          const g = srcData[i + 1];
-          const b = srcData[i + 2];
-          const a = srcData[i + 3];
-
-          if (a > 0) { // Only draw non-transparent pixels
-            destCtx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
-            destCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-          }
-        }
-      }
+      // Draw the source canvas onto the destination canvas, scaling it up
+      destCtx.drawImage(srcCanvas, 0, 0, originalWidth, originalHeight, 0, 0, resolution, resolution);
 
       // Trigger download
       const link = document.createElement('a');
