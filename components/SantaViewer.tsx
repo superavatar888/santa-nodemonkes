@@ -160,7 +160,7 @@ export default function SantaViewer() {
   const updateImage = (imageId: string) => {
     const parsedId = parseInt(imageId, 10)
     if (!isNaN(parsedId) && parsedId >= 1 && parsedId <= 10000) {
-      setImageUrl(`/assets/merged/${imageId}.png`)
+      setImageUrl(`public/assets/merged/${imageId}.png`)
     } else {
       setImageUrl("")
     }
