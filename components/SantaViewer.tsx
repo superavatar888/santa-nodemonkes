@@ -148,7 +148,7 @@ export default function SantaViewer() {
   }
 
   const validateAndSetId = (inputId: string) => {
-    const parsedId = parseInt(inputId, 10)
+    const parsedId = Number.parseInt(inputId, 10)
     if (!isNaN(parsedId) && parsedId >= 1 && parsedId <= 10000) {
       setId(inputId)
       showStatus(`显示图片 ID: ${inputId}`)
@@ -158,7 +158,7 @@ export default function SantaViewer() {
   }
 
   const updateImage = (imageId: string) => {
-    const parsedId = parseInt(imageId, 10)
+    const parsedId = Number.parseInt(imageId, 10)
     if (!isNaN(parsedId) && parsedId >= 1 && parsedId <= 10000) {
       setImageUrl(`https://santamonkes.138148178.xyz/merged/${imageId}.png`)
     } else {
@@ -181,7 +181,7 @@ export default function SantaViewer() {
         showStatus("元数据未加载，无法使用自动背景功能。", true)
         return
       }
-      const imageId = parseInt(id, 10)
+      const imageId = Number.parseInt(id, 10)
       if (!isNaN(imageId)) {
         const autoBg = getAutoBackground(imageId)
         if (autoBg) {
@@ -196,123 +196,233 @@ export default function SantaViewer() {
     }
   }
 
-  const downloadImage = () => {
+  const downloadImage = async () => {
     if (!imageUrl) {
-      showStatus("没有可供下载的图片", true);
-      return;
+      showStatus("没有可供下载的图片", true)
+      return
     }
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = imageUrl;
+    showStatus("正在准备下载...")
 
-    img.onload = () => {
-      // Create a temporary source canvas to draw the original image
-      const srcCanvas = document.createElement('canvas');
-      const srcCtx = srcCanvas.getContext('2d');
-      if (!srcCtx) {
-        showStatus("无法创建图片，浏览器支持不足。", true);
-        return;
-      }
-      
-      const originalWidth = img.naturalWidth;
-      const originalHeight = img.naturalHeight;
-      srcCanvas.width = originalWidth;
-      srcCanvas.height = originalHeight;
-      srcCtx.drawImage(img, 0, 0);
+    try {
+      // 方法1: 尝试使用 fetch 下载
+      const response = await fetch(imageUrl, {
+        mode: "cors",
+        credentials: "omit",
+      })
 
-      // Create the destination canvas
-      const destCanvas = document.createElement('canvas');
-      destCanvas.width = resolution;
-      destCanvas.height = resolution;
-      const destCtx = destCanvas.getContext('2d');
-      if (!destCtx) {
-        showStatus("无法创建图片，浏览器支持不足。", true);
-        return;
+      if (!response.ok) {
+        throw new Error("Fetch failed")
       }
 
-      // Fill background
-      destCtx.fillStyle = bgColor;
-      destCtx.fillRect(0, 0, resolution, resolution);
-      
-      // Disable image smoothing on the destination canvas
-      destCtx.imageSmoothingEnabled = false;
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const img = new Image()
+      img.src = blobUrl
 
-      // Draw the source canvas onto the destination canvas, scaling it up
-      destCtx.drawImage(srcCanvas, 0, 0, originalWidth, originalHeight, 0, 0, resolution, resolution);
+      img.onload = () => {
+        try {
+          // 创建源 canvas
+          const srcCanvas = document.createElement("canvas")
+          const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true })
+          if (!srcCtx) {
+            showStatus("无法创建图片，浏览器支持不足。", true)
+            URL.revokeObjectURL(blobUrl)
+            return
+          }
 
-      // Trigger download
-      const link = document.createElement('a');
-      link.href = destCanvas.toDataURL('image/png');
-      link.download = `santa-nodemonke-${id}-${resolution}px-HD.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showStatus("高清图片已开始下载！");
-    };
+          const originalWidth = img.naturalWidth
+          const originalHeight = img.naturalHeight
+          srcCanvas.width = originalWidth
+          srcCanvas.height = originalHeight
+          srcCtx.drawImage(img, 0, 0)
 
-    img.onerror = () => {
-      showStatus("加载图片失败，无法完成下载。", true);
-    };
-  };
+          // 创建目标 canvas
+          const destCanvas = document.createElement("canvas")
+          destCanvas.width = resolution
+          destCanvas.height = resolution
+          const destCtx = destCanvas.getContext("2d", { willReadFrequently: true })
+          if (!destCtx) {
+            showStatus("无法创建图片，浏览器支持不足。", true)
+            URL.revokeObjectURL(blobUrl)
+            return
+          }
+
+          // 填充背景色
+          destCtx.fillStyle = bgColor
+          destCtx.fillRect(0, 0, resolution, resolution)
+
+          // 禁用图像平滑以保持像素风格
+          destCtx.imageSmoothingEnabled = false
+
+          // 将源图片缩放绘制到目标 canvas
+          destCtx.drawImage(srcCanvas, 0, 0, originalWidth, originalHeight, 0, 0, resolution, resolution)
+
+          // 转换为 blob 并下载
+          destCanvas.toBlob((outputBlob) => {
+            if (outputBlob) {
+              const downloadLink = document.createElement("a")
+              downloadLink.href = URL.createObjectURL(outputBlob)
+              downloadLink.download = `santa-nodemonke-${id}-${resolution}px-HD.png`
+              document.body.appendChild(downloadLink)
+              downloadLink.click()
+              document.body.removeChild(downloadLink)
+              URL.revokeObjectURL(downloadLink.href)
+              showStatus("高清图片已开始下载！")
+            } else {
+              showStatus("生成图片失败", true)
+            }
+            URL.revokeObjectURL(blobUrl)
+          }, "image/png")
+        } catch (error) {
+          console.error("[v0] Canvas error:", error)
+          showStatus("处理图片时出错", true)
+          URL.revokeObjectURL(blobUrl)
+        }
+      }
+
+      img.onerror = () => {
+        showStatus("加载图片失败", true)
+        URL.revokeObjectURL(blobUrl)
+      }
+    } catch (error) {
+      console.error("[v0] Fetch failed:", error)
+
+      // 方法2: 如果 fetch 失败，尝试使用隐藏的 img 元素
+      try {
+        const img = new Image()
+        // 不设置 crossOrigin，让浏览器使用默认行为
+        img.src = imageUrl
+
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas")
+            canvas.width = resolution
+            canvas.height = resolution
+            const ctx = canvas.getContext("2d", { willReadFrequently: true })
+
+            if (!ctx) {
+              throw new Error("Canvas context not available")
+            }
+
+            // 填充背景
+            ctx.fillStyle = bgColor
+            ctx.fillRect(0, 0, resolution, resolution)
+            ctx.imageSmoothingEnabled = false
+
+            // 直接绘制图片（按比例缩放）
+            const scale = resolution / Math.max(img.naturalWidth, img.naturalHeight)
+            const scaledWidth = img.naturalWidth * scale
+            const scaledHeight = img.naturalHeight * scale
+            const x = (resolution - scaledWidth) / 2
+            const y = (resolution - scaledHeight) / 2
+
+            ctx.drawImage(img, x, y, scaledWidth, scaledHeight)
+
+            // 尝试转换为 blob
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const link = document.createElement("a")
+                link.href = URL.createObjectURL(blob)
+                link.download = `santa-nodemonke-${id}-${resolution}px-HD.png`
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                URL.revokeObjectURL(link.href)
+                showStatus("图片已下载！")
+              } else {
+                throw new Error("Failed to create blob")
+              }
+            }, "image/png")
+          } catch (canvasError) {
+            console.error("[v0] Canvas fallback failed:", canvasError)
+            // 方法3: 直接下载原始图片
+            const link = document.createElement("a")
+            link.href = imageUrl
+            link.download = `santa-nodemonke-${id}.png`
+            link.target = "_blank"
+            link.rel = "noopener noreferrer"
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            showStatus("使用备用下载方式（原始图片）")
+          }
+        }
+
+        img.onerror = () => {
+          // 方法3: 最终备用方案 - 直接下载
+          const link = document.createElement("a")
+          link.href = imageUrl
+          link.download = `santa-nodemonke-${id}.png`
+          link.target = "_blank"
+          link.rel = "noopener noreferrer"
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          showStatus("使用直接下载方式")
+        }
+      } catch (finalError) {
+        console.error("[v0] All download methods failed:", finalError)
+        showStatus("下载失败，请稍后重试", true)
+      }
+    }
+  }
 
   return (
     <div
       style={{
-        textAlign: 'center',
-        background: 'rgba(255, 255, 255, 0.1)',
-        padding: '20px',
-        borderRadius: '16px',
-        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.18)',
-        maxWidth: '800px',
-        margin: '40px auto',
-        color: 'white',
+        textAlign: "center",
+        background: "rgba(255, 255, 255, 0.1)",
+        padding: "20px",
+        borderRadius: "16px",
+        boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.37)",
+        backdropFilter: "blur(10px)",
+        border: "1px solid rgba(255, 255, 255, 0.18)",
+        maxWidth: "800px",
+        margin: "40px auto",
+        color: "white",
       }}
     >
-      <div style={{ marginBottom: '30px', paddingTop: '10px' }}>
+      <div style={{ marginBottom: "30px", paddingTop: "10px" }}>
         <h1
           style={{
             fontFamily: '"Mountains of Christmas", cursive',
-            fontSize: '3.5rem',
-            fontWeight: '700',
-            color: '#E63946',
-            textShadow: '2px 2px 4px rgba(0,0,0,0.2)',
-            marginBottom: '8px',
-            lineHeight: '1.2',
+            fontSize: "3.5rem",
+            fontWeight: "700",
+            color: "#E63946",
+            textShadow: "2px 2px 4px rgba(0,0,0,0.2)",
+            marginBottom: "8px",
+            lineHeight: "1.2",
           }}
         >
           Santa Nodemonkes Viewer
         </h1>
         <p
           style={{
-            fontSize: '1.25rem',
-            color: '#F1FAEE',
-            margin: '0',
+            fontSize: "1.25rem",
+            color: "#F1FAEE",
+            margin: "0",
           }}
         >
           Create your festive Nodemonke!
         </p>
       </div>
-      
-      {/* 状态指示器 */}
+
       <div
         style={{
-          marginBottom: '20px',
-          padding: '10px',
-          background: metadataLoaded ? 'rgba(22, 163, 74, 0.5)' : 'rgba(251, 191, 36, 0.5)',
-          borderRadius: '8px',
-          fontSize: '14px',
-          color: '#F1FAEE',
-          border: metadataLoaded ? '1px solid #16A34A' : '1px solid #FBBF24',
+          marginBottom: "20px",
+          padding: "10px",
+          background: metadataLoaded ? "rgba(22, 163, 74, 0.5)" : "rgba(251, 191, 36, 0.5)",
+          borderRadius: "8px",
+          fontSize: "14px",
+          color: "#F1FAEE",
+          border: metadataLoaded ? "1px solid #16A34A" : "1px solid #FBBF24",
         }}
       >
         Status: {metadataLoaded ? "✅ Metadata Loaded" : "⚠️ Metadata Loading Failed"}
       </div>
 
-      {/* ID 输入 */}
-      <div style={{ margin: '20px 0' }}>
+      <div style={{ margin: "20px 0" }}>
         <input
           id="idInput"
           type="text"
@@ -320,24 +430,21 @@ export default function SantaViewer() {
           onChange={(e) => validateAndSetId(e.target.value)}
           placeholder="Enter ID"
           style={{
-            padding: '10px',
-            fontSize: '16px',
-            width: '220px',
-            marginRight: '10px',
-            border: '2px solid #A8DADC',
-            borderRadius: '8px',
-            background: 'rgba(29, 53, 87, 0.7)',
-            color: 'white',
+            padding: "10px",
+            fontSize: "16px",
+            width: "220px",
+            marginRight: "10px",
+            border: "2px solid #A8DADC",
+            borderRadius: "8px",
+            background: "rgba(29, 53, 87, 0.7)",
+            color: "white",
           }}
         />
-        <div style={{ fontSize: '12px', color: '#F1FAEE', marginTop: '8px' }}>
-          Enter an ID between 1-10000
-        </div>
+        <div style={{ fontSize: "12px", color: "#F1FAEE", marginTop: "8px" }}>Enter an ID between 1-10000</div>
       </div>
 
-      {/* 分辨率设置 */}
-      <div style={{ margin: '30px 0' }}>
-        <label htmlFor="resolutionInput" style={{ marginRight: '10px', fontSize: '16px', color: '#F1FAEE' }}>
+      <div style={{ margin: "30px 0" }}>
+        <label htmlFor="resolutionInput" style={{ marginRight: "10px", fontSize: "16px", color: "#F1FAEE" }}>
           Resolution (px):
         </label>
         <input
@@ -349,60 +456,98 @@ export default function SantaViewer() {
           max={1200}
           step={28}
           style={{
-            padding: '10px',
-            fontSize: '16px',
-            width: '120px',
-            border: '2px solid #A8DADC',
-            borderRadius: '8px',
-            background: 'rgba(29, 53, 87, 0.7)',
-            color: 'white',
+            padding: "10px",
+            fontSize: "16px",
+            width: "120px",
+            border: "2px solid #A8DADC",
+            borderRadius: "8px",
+            background: "rgba(29, 53, 87, 0.7)",
+            color: "white",
           }}
         />
-        <div style={{ fontSize: '12px', color: '#F1FAEE', marginTop: '8px' }}>
+        <div style={{ fontSize: "12px", color: "#F1FAEE", marginTop: "8px" }}>
           Adjust the size of the image (Original: 28x28)
         </div>
       </div>
 
-      {/* 背景控制 */}
-      <div style={{ margin: '20px 0', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px' }}>
-        <button onClick={() => updateBackground("auto")} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', background: '#457B9D', color: 'white', border: 'none', borderRadius: '8px', transition: 'background 0.3s' }}>Auto Background</button>
-        <button onClick={() => updateBackground("custom")} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', background: '#A8DADC', color: '#1D3557', border: 'none', borderRadius: '8px', transition: 'background 0.3s' }}>Custom Color</button>
+      <div style={{ margin: "20px 0", display: "flex", justifyContent: "center", alignItems: "center", gap: "15px" }}>
+        <button
+          onClick={() => updateBackground("auto")}
+          style={{
+            padding: "10px 20px",
+            fontSize: "16px",
+            cursor: "pointer",
+            background: "#457B9D",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            transition: "background 0.3s",
+          }}
+        >
+          Auto Background
+        </button>
+        <button
+          onClick={() => updateBackground("custom")}
+          style={{
+            padding: "10px 20px",
+            fontSize: "16px",
+            cursor: "pointer",
+            background: "#A8DADC",
+            color: "#1D3557",
+            border: "none",
+            borderRadius: "8px",
+            transition: "background 0.3s",
+          }}
+        >
+          Custom Color
+        </button>
         {showColorPicker && (
           <input
             type="color"
             value={bgColor}
             onChange={(e) => setBgColor(e.target.value)}
-            style={{ marginLeft: "10px", height: '40px', width: '40px', border: 'none', background: 'transparent' }}
+            style={{ marginLeft: "10px", height: "40px", width: "40px", border: "none", background: "transparent" }}
           />
         )}
       </div>
 
-      {/* 保存图片按钮 */}
       <div style={{ margin: "20px 0" }}>
-        <button onClick={downloadImage} style={{ padding: '12px 24px', fontSize: '18px', cursor: 'pointer', background: '#E63946', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', transition: 'transform 0.2s' }}>
+        <button
+          onClick={downloadImage}
+          style={{
+            padding: "12px 24px",
+            fontSize: "18px",
+            cursor: "pointer",
+            background: "#E63946",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            fontWeight: "bold",
+            transition: "transform 0.2s",
+          }}
+        >
           Save Image
         </button>
       </div>
 
-      {/* 预览区域 */}
       <div
         style={{
           width: resolution,
           height: resolution,
-          margin: '30px auto',
+          margin: "30px auto",
           backgroundColor: bgColor,
-          border: '3px dashed #A8DADC',
-          overflow: 'hidden',
-          borderRadius: '16px',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          transition: 'background-color 0.5s',
+          border: "3px dashed #A8DADC",
+          overflow: "hidden",
+          borderRadius: "16px",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          transition: "background-color 0.5s",
         }}
       >
         {imageUrl ? (
           <img
-            src={imageUrl}
+            src={imageUrl || "/placeholder.svg"}
             alt={`Nodemonke ${id}`}
             style={{ width: "100%", height: "100%", objectFit: "contain", imageRendering: "pixelated" }}
           />
@@ -411,17 +556,16 @@ export default function SantaViewer() {
         )}
       </div>
 
-      {/* 状态消息 */}
       {status && (
         <div
           style={{
-            margin: '10px 0',
-            padding: '12px',
-            borderRadius: '8px',
-            textAlign: 'center',
-            background: isError ? 'rgba(230, 57, 70, 0.7)' : 'rgba(69, 123, 157, 0.7)',
-            color: '#F1FAEE',
-            border: isError ? '1px solid #E63946' : '1px solid #457B9D',
+            margin: "10px 0",
+            padding: "12px",
+            borderRadius: "8px",
+            textAlign: "center",
+            background: isError ? "rgba(230, 57, 70, 0.7)" : "rgba(69, 123, 157, 0.7)",
+            color: "#F1FAEE",
+            border: isError ? "1px solid #E63946" : "1px solid #457B9D",
           }}
         >
           {status}
