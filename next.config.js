@@ -1,15 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: 'export',  <-- 删除或注释这一行
+  // 开启静态导出，生成 out 文件夹
+  output: 'export',
   
-  // 如果你需要允许跨域图片，保留 images 配置，否则可以忽略
+  // 静态导出必须关闭 Next.js 自带的图片优化，因为没有服务器处理图片
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
+    unoptimized: true,
   },
 };
 
