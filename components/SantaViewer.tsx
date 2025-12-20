@@ -202,169 +202,79 @@ export default function SantaViewer() {
       return
     }
 
-    showStatus("正在准备下载...")
+    showStatus("正在生成高清图片...")
 
     try {
-      // 方法1: 尝试使用 fetch 下载
-      const response = await fetch(imageUrl, {
-        mode: "cors",
-        credentials: "omit",
+      // 创建一个新的图片元素来加载原始图片
+      const img = new Image()
+      img.crossOrigin = "anonymous"
+
+      // 使用 Promise 来处理图片加载
+      const loadImage = new Promise<HTMLImageElement>((resolve, reject) => {
+        img.onload = () => resolve(img)
+        img.onerror = () => reject(new Error("图片加载失败"))
+        img.src = imageUrl
       })
 
-      if (!response.ok) {
-        throw new Error("Fetch failed")
+      const loadedImg = await loadImage
+
+      // 创建 canvas 用于高清渲染
+      const canvas = document.createElement("canvas")
+      canvas.width = resolution
+      canvas.height = resolution
+      const ctx = canvas.getContext("2d", {
+        alpha: true,
+        willReadFrequently: false,
+      })
+
+      if (!ctx) {
+        showStatus("浏览器不支持 Canvas 功能", true)
+        return
       }
 
-      const blob = await response.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      const img = new Image()
-      img.src = blobUrl
+      // 禁用图像平滑，保持像素艺术风格
+      ctx.imageSmoothingEnabled = false
 
-      img.onload = () => {
-        try {
-          // 创建源 canvas
-          const srcCanvas = document.createElement("canvas")
-          const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true })
-          if (!srcCtx) {
-            showStatus("无法创建图片，浏览器支持不足。", true)
-            URL.revokeObjectURL(blobUrl)
+      // 填充背景色
+      ctx.fillStyle = bgColor
+      ctx.fillRect(0, 0, resolution, resolution)
+
+      // 将原始图片按比例缩放到指定分辨率
+      // 使用最近邻插值保持像素风格
+      ctx.drawImage(loadedImg, 0, 0, resolution, resolution)
+
+      // 转换为 Blob 并触发下载
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            showStatus("生成图片失败", true)
             return
           }
 
-          const originalWidth = img.naturalWidth
-          const originalHeight = img.naturalHeight
-          srcCanvas.width = originalWidth
-          srcCanvas.height = originalHeight
-          srcCtx.drawImage(img, 0, 0)
-
-          // 创建目标 canvas
-          const destCanvas = document.createElement("canvas")
-          destCanvas.width = resolution
-          destCanvas.height = resolution
-          const destCtx = destCanvas.getContext("2d", { willReadFrequently: true })
-          if (!destCtx) {
-            showStatus("无法创建图片，浏览器支持不足。", true)
-            URL.revokeObjectURL(blobUrl)
-            return
-          }
-
-          // 填充背景色
-          destCtx.fillStyle = bgColor
-          destCtx.fillRect(0, 0, resolution, resolution)
-
-          // 禁用图像平滑以保持像素风格
-          destCtx.imageSmoothingEnabled = false
-
-          // 将源图片缩放绘制到目标 canvas
-          destCtx.drawImage(srcCanvas, 0, 0, originalWidth, originalHeight, 0, 0, resolution, resolution)
-
-          // 转换为 blob 并下载
-          destCanvas.toBlob((outputBlob) => {
-            if (outputBlob) {
-              const downloadLink = document.createElement("a")
-              downloadLink.href = URL.createObjectURL(outputBlob)
-              downloadLink.download = `santa-nodemonke-${id}-${resolution}px-HD.png`
-              document.body.appendChild(downloadLink)
-              downloadLink.click()
-              document.body.removeChild(downloadLink)
-              URL.revokeObjectURL(downloadLink.href)
-              showStatus("高清图片已开始下载！")
-            } else {
-              showStatus("生成图片失败", true)
-            }
-            URL.revokeObjectURL(blobUrl)
-          }, "image/png")
-        } catch (error) {
-          console.error("[v0] Canvas error:", error)
-          showStatus("处理图片时出错", true)
-          URL.revokeObjectURL(blobUrl)
-        }
-      }
-
-      img.onerror = () => {
-        showStatus("加载图片失败", true)
-        URL.revokeObjectURL(blobUrl)
-      }
-    } catch (error) {
-      console.error("[v0] Fetch failed:", error)
-
-      // 方法2: 如果 fetch 失败，尝试使用隐藏的 img 元素
-      try {
-        const img = new Image()
-        // 不设置 crossOrigin，让浏览器使用默认行为
-        img.src = imageUrl
-
-        img.onload = () => {
-          try {
-            const canvas = document.createElement("canvas")
-            canvas.width = resolution
-            canvas.height = resolution
-            const ctx = canvas.getContext("2d", { willReadFrequently: true })
-
-            if (!ctx) {
-              throw new Error("Canvas context not available")
-            }
-
-            // 填充背景
-            ctx.fillStyle = bgColor
-            ctx.fillRect(0, 0, resolution, resolution)
-            ctx.imageSmoothingEnabled = false
-
-            // 直接绘制图片（按比例缩放）
-            const scale = resolution / Math.max(img.naturalWidth, img.naturalHeight)
-            const scaledWidth = img.naturalWidth * scale
-            const scaledHeight = img.naturalHeight * scale
-            const x = (resolution - scaledWidth) / 2
-            const y = (resolution - scaledHeight) / 2
-
-            ctx.drawImage(img, x, y, scaledWidth, scaledHeight)
-
-            // 尝试转换为 blob
-            canvas.toBlob((blob) => {
-              if (blob) {
-                const link = document.createElement("a")
-                link.href = URL.createObjectURL(blob)
-                link.download = `santa-nodemonke-${id}-${resolution}px-HD.png`
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-                URL.revokeObjectURL(link.href)
-                showStatus("图片已下载！")
-              } else {
-                throw new Error("Failed to create blob")
-              }
-            }, "image/png")
-          } catch (canvasError) {
-            console.error("[v0] Canvas fallback failed:", canvasError)
-            // 方法3: 直接下载原始图片
-            const link = document.createElement("a")
-            link.href = imageUrl
-            link.download = `santa-nodemonke-${id}.png`
-            link.target = "_blank"
-            link.rel = "noopener noreferrer"
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            showStatus("使用备用下载方式（原始图片）")
-          }
-        }
-
-        img.onerror = () => {
-          // 方法3: 最终备用方案 - 直接下载
+          // 创建下载链接
+          const url = URL.createObjectURL(blob)
           const link = document.createElement("a")
-          link.href = imageUrl
-          link.download = `santa-nodemonke-${id}.png`
-          link.target = "_blank"
-          link.rel = "noopener noreferrer"
+          link.href = url
+          link.download = `santa-nodemonke-${id}-${resolution}x${resolution}.png`
+
+          // 触发下载
           document.body.appendChild(link)
           link.click()
-          document.body.removeChild(link)
-          showStatus("使用直接下载方式")
-        }
-      } catch (finalError) {
-        console.error("[v0] All download methods failed:", finalError)
-        showStatus("下载失败，请稍后重试", true)
-      }
+
+          // 清理
+          setTimeout(() => {
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+          }, 100)
+
+          showStatus(`✅ ${resolution}x${resolution} 高清图片已保存！`)
+        },
+        "image/png",
+        1.0, // 最高质量
+      )
+    } catch (error) {
+      console.error("[v0] Download error:", error)
+      showStatus("下载失败，请检查网络连接或稍后重试", true)
     }
   }
 
