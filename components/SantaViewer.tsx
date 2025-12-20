@@ -5,8 +5,6 @@ import { useState, useEffect } from "react"
 const isMobile = typeof window !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 const defaultResolution = isMobile ? 280 : 560
 
-const BASE_PATH = "/santa-nodemonkes"; // Manually define the base path for static assets
-
 interface Metadata {
   id: number
   inscription: number
@@ -162,7 +160,7 @@ export default function SantaViewer() {
   const updateImage = (imageId: string) => {
     const parsedId = parseInt(imageId, 10)
     if (!isNaN(parsedId) && parsedId >= 1 && parsedId <= 10000) {
-      setImageUrl(`${BASE_PATH}/assets/merged/${imageId}.png`)
+      setImageUrl(`/assets/merged/${imageId}.png`)
     } else {
       setImageUrl("")
     }
