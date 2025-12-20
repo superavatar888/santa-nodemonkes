@@ -203,53 +203,86 @@ export default function SantaViewer() {
     }
 
     showStatus("正在生成高清图片...")
+    console.log("[v0] Starting download process")
+    console.log("[v0] Image URL:", imageUrl)
+    console.log("[v0] Resolution:", resolution)
+    console.log("[v0] Background color:", bgColor)
 
     try {
-      // 创建一个新的图片元素来加载原始图片
-      const img = new Image()
-      img.crossOrigin = "anonymous"
+      console.log("[v0] Attempting method 1: fetch with blob")
 
-      // 使用 Promise 来处理图片加载
+      const response = await fetch(imageUrl)
+      console.log("[v0] Fetch response status:", response.status)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const blob = await response.blob()
+      console.log("[v0] Blob created:", blob.type, blob.size)
+
+      // 将 blob 转换为图片
+      const img = new Image()
+      const imgUrl = URL.createObjectURL(blob)
+
       const loadImage = new Promise<HTMLImageElement>((resolve, reject) => {
-        img.onload = () => resolve(img)
-        img.onerror = () => reject(new Error("图片加载失败"))
-        img.src = imageUrl
+        img.onload = () => {
+          console.log("[v0] Image loaded successfully")
+          resolve(img)
+        }
+        img.onerror = (e) => {
+          console.error("[v0] Image load error:", e)
+          reject(new Error("图片加载失败"))
+        }
+        img.src = imgUrl
       })
 
       const loadedImg = await loadImage
+      console.log("[v0] Image dimensions:", loadedImg.width, "x", loadedImg.height)
 
       // 创建 canvas 用于高清渲染
       const canvas = document.createElement("canvas")
       canvas.width = resolution
       canvas.height = resolution
+      console.log("[v0] Canvas created:", canvas.width, "x", canvas.height)
+
       const ctx = canvas.getContext("2d", {
         alpha: true,
         willReadFrequently: false,
       })
 
       if (!ctx) {
+        console.error("[v0] Failed to get canvas context")
         showStatus("浏览器不支持 Canvas 功能", true)
         return
       }
 
       // 禁用图像平滑，保持像素艺术风格
       ctx.imageSmoothingEnabled = false
+      console.log("[v0] Image smoothing disabled")
 
       // 填充背景色
       ctx.fillStyle = bgColor
       ctx.fillRect(0, 0, resolution, resolution)
+      console.log("[v0] Background filled with color:", bgColor)
 
       // 将原始图片按比例缩放到指定分辨率
-      // 使用最近邻插值保持像素风格
       ctx.drawImage(loadedImg, 0, 0, resolution, resolution)
+      console.log("[v0] Image drawn to canvas")
+
+      // 清理临时 URL
+      URL.revokeObjectURL(imgUrl)
 
       // 转换为 Blob 并触发下载
       canvas.toBlob(
         (blob) => {
           if (!blob) {
+            console.error("[v0] Failed to create blob from canvas")
             showStatus("生成图片失败", true)
             return
           }
+
+          console.log("[v0] Canvas blob created:", blob.size, "bytes")
 
           // 创建下载链接
           const url = URL.createObjectURL(blob)
@@ -259,22 +292,40 @@ export default function SantaViewer() {
 
           // 触发下载
           document.body.appendChild(link)
+          console.log("[v0] Download link created and clicked")
           link.click()
 
           // 清理
           setTimeout(() => {
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
+            console.log("[v0] Download cleanup completed")
           }, 100)
 
           showStatus(`✅ ${resolution}x${resolution} 高清图片已保存！`)
         },
         "image/png",
-        1.0, // 最高质量
+        1.0,
       )
     } catch (error) {
       console.error("[v0] Download error:", error)
-      showStatus("下载失败，请检查网络连接或稍后重试", true)
+      console.error("[v0] Error details:", error instanceof Error ? error.message : String(error))
+
+      console.log("[v0] Attempting fallback method: direct download")
+      try {
+        const link = document.createElement("a")
+        link.href = imageUrl
+        link.download = `santa-nodemonke-${id}.png`
+        link.target = "_blank"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        showStatus("正在下载原始图片...", false)
+        console.log("[v0] Fallback download triggered")
+      } catch (fallbackError) {
+        console.error("[v0] Fallback also failed:", fallbackError)
+        showStatus("下载失败，请右键点击图片选择'保存图片'", true)
+      }
     }
   }
 
