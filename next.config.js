@@ -1,5 +1,3 @@
-const repoName = "santa-nodemonkes";
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     output: "export",
@@ -7,9 +5,6 @@ const nextConfig = {
     images: {
         unoptimized: true,
     },
-    
-    basePath: `/${repoName}`, 
-    assetPrefix: `/${repoName}/`,
     
     distDir: "out",
     eslint: {
