@@ -1,4 +1,4 @@
-"use client"
+"use client" // <--- 1. 必须添加这行，标记为客户端组件
 
 import { useState, useEffect } from "react"
 
@@ -196,6 +196,7 @@ export default function SantaViewer() {
     }
   }
 
+  // --- 2. 核心修改：移除后端 API 调用，改为纯前端 Fetch + Canvas ---
   const downloadImage = async () => {
     if (!imageUrl) {
       showStatus("没有可供下载的图片", true)
@@ -205,12 +206,14 @@ export default function SantaViewer() {
     showStatus("正在生成高清图片...")
 
     try {
-      const apiUrl = `/api/download-image?url=${encodeURIComponent(imageUrl)}`
-
-      const response = await fetch(apiUrl)
+      // 修改点：直接请求 imageUrl，而不是 /api/download-image
+      // 注意：这里需要 mode: 'cors'，且图片服务器必须允许跨域
+      const response = await fetch(imageUrl, {
+        mode: 'cors',
+      })
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw new Error(`HTTP ${response.status} - 图片加载失败`)
       }
 
       const blob = await response.blob()
@@ -221,6 +224,8 @@ export default function SantaViewer() {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve()
         img.onerror = () => reject(new Error("图片加载失败"))
+        // 关键：确保设置为 anonymous，虽然 blob url 本身是安全的，但作为习惯
+        img.crossOrigin = "anonymous" 
         img.src = imgUrl
       })
 
@@ -234,15 +239,19 @@ export default function SantaViewer() {
         return
       }
 
+      // 关闭抗锯齿，保持像素风格
       ctx.imageSmoothingEnabled = false
 
+      // 1. 绘制背景色
       ctx.fillStyle = bgColor
       ctx.fillRect(0, 0, resolution, resolution)
 
+      // 2. 绘制图片（覆盖在背景上）
       ctx.drawImage(img, 0, 0, resolution, resolution)
 
       URL.revokeObjectURL(imgUrl)
 
+      // 3. 导出并下载
       canvas.toBlob(
         (canvasBlob) => {
           if (!canvasBlob) {
@@ -269,8 +278,8 @@ export default function SantaViewer() {
         1.0,
       )
     } catch (error) {
-      console.error("[v0] Download error:", error)
-      showStatus("下载失败，请稍后重试", true)
+      console.error("[FrontEnd] Download error:", error)
+      showStatus("下载失败，可能是跨域限制，请尝试长按图片保存", true)
     }
   }
 
